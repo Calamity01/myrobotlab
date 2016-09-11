@@ -704,6 +704,9 @@ public class Servo extends Service implements ServoControl {
 	}
 
   public void setVelocity(int velocity) {
+    if (velocity > maxVelocity) {
+      velocity = maxVelocity;
+    }
     this.velocity = velocity;
     if (isControllerSet()){
       getController().servoSetVelocity(this);
@@ -735,15 +738,6 @@ public class Servo extends Service implements ServoControl {
     
   }
   
-  public void setSpeedScale(Double speedScale) {
-    if (speedScale >= 1.0){
-      this.speedScale  = speedScale;
-    }
-    else{
-      log.info("speedScale must be >= 1.0");
-    }
-  }
-
   @Override
   public int getVelocity() {
     // TODO Auto-generated method stub
