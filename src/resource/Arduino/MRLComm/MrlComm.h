@@ -58,7 +58,7 @@ public:
     int getFreeRam();
     Device* getDevice(int id);
 
-    bool ackEnabled = false;
+    bool ackEnabled = true;
 
     Device* addDevice(Device* device);
     void update();
@@ -84,8 +84,8 @@ public:
 	void enableHeartbeat( boolean enabled);
 	// > heartbeat
 	void heartbeat();
-	// > echo/bu32 sInt
-	void echo( unsigned long sInt);
+	// > echo/f32 myFloat/myByte/f32 secondFloat
+	void echo( float myFloat,  byte myByte,  float secondFloat);
 	// > controllerAttach/serialPort
 	void controllerAttach( byte serialPort);
 	// > customMsg/[] msg
@@ -128,10 +128,8 @@ public:
 	void servoSweepStart( byte deviceId,  byte min,  byte max,  byte step);
 	// > servoSweepStop/deviceId
 	void servoSweepStop( byte deviceId);
-	// > servoWrite/deviceId/b16 target
-	void servoWrite( byte deviceId,  int target);
-	// > servoWriteMicroseconds/deviceId/b16 ms
-	void servoWriteMicroseconds( byte deviceId,  int ms);
+	// > servoMoveToMicroseconds/deviceId/b16 target
+	void servoMoveToMicroseconds( byte deviceId,  int target);
 	// > servoSetAcceleration/deviceId/b16 acceleration
 	void servoSetAcceleration( byte deviceId,  int acceleration);
 	// > serialAttach/deviceId/relayPin

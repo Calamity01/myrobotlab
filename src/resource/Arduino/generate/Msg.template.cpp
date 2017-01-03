@@ -110,6 +110,15 @@ long Msg::b32(const byte* buffer, const int start/*=0*/) {
     return result;
 }
 
+float Msg::f32(const byte* buffer, const int start/*=0*/) {
+
+	const byte * ptr = buffer + start;
+
+    float newFloat = 0;
+    memcpy(&newFloat, ptr, sizeof(newFloat));
+    return newFloat;
+}
+
 unsigned long Msg::bu32(const byte* buffer, const int start/*=0*/) {
     unsigned long result = 0;
     for (int i = 0; i < 4; i++) {
@@ -200,6 +209,18 @@ void Msg::writeb32(const long b32){
 	write(b32 >> 16 & 0xFF);
 	write(b32 >> 8 & 0xFF);
 	write(b32 & 0xFF);
+}
+
+void Msg::writef32(const float f32){
+	byte temp [4];
+
+    float newFloat = 0;
+    memcpy(temp, &f32, sizeof(newFloat));
+
+	write(temp[3]);
+	write(temp[2]);
+	write(temp[1]);
+	write(temp[0]);
 }
 
 void Msg::writebu32(const unsigned long bu32){

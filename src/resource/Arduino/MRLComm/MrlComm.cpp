@@ -243,8 +243,12 @@ void MrlComm::getBoardInfo() {
  const char*name2, byte configSize, const byte*config,
  unsigned long bui322) {
  */
-void MrlComm::echo(unsigned long b32) {
-	msg->publishEcho(b32);
+void MrlComm::echo(float myFloat, byte myByte, float mySecondFloat) {
+	msg->publishDebug(String("echo float " + String(myFloat)));
+	msg->publishDebug(String("echo byte " + String(myByte)));
+	msg->publishDebug(String("echo float2 " + String(mySecondFloat)));
+	// msg->publishDebug(String("pi is " + String(3.141529)));
+	msg->publishEcho(myFloat, myByte, mySecondFloat);
 }
 
 // > controllerAttach/serialPort
@@ -380,11 +384,11 @@ void MrlComm::neoPixelWriteMatrix(byte deviceId, byte bufferSize, const byte*buf
 }
 
 // > servoAttach/deviceId/pin/targetOutput/b16 velocity
-void MrlComm::servoAttach(byte deviceId, byte pin, int targetOutput, int velocity) {
+void MrlComm::servoAttach(byte deviceId, byte pin, int initialPosUs, int velocity) {
 	MrlServo* servo = new MrlServo(deviceId);
 	addDevice(servo);
 	// not your mama's attach - this is attaching/initializing the MrlDevice
-	servo->attach(pin, targetOutput, velocity);
+	servo->attach(pin, initialPosUs, velocity);
 }
 
 // > servoEnablePwm/deviceId/pin
@@ -426,15 +430,17 @@ void MrlComm::servoSweepStop(byte deviceId) {
 	servo->stopSweep();
 }
 
-void MrlComm::servoWrite(byte deviceId, int target) {
+void MrlComm::servoMoveToMicroseconds(byte deviceId, int target) {
 	MrlServo* servo = (MrlServo*) getDevice(deviceId);
-	servo->servoWrite(target);
+	servo->moveToMicroseconds(target);
 }
 
+/*
 void MrlComm::servoWriteMicroseconds(byte deviceId, int ms) {
 	MrlServo* servo = (MrlServo*) getDevice(deviceId);
 	servo->servoWriteMicroseconds(ms);
 }
+*/
 
 void MrlComm::setDebug(bool enabled) {
 	msg->debug = enabled;

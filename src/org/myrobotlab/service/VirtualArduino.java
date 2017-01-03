@@ -23,7 +23,6 @@ import org.myrobotlab.logging.LoggerFactory;
 import org.myrobotlab.logging.Logging;
 import org.myrobotlab.logging.LoggingFactory;
 import org.myrobotlab.serial.PortQueue;
-import org.myrobotlab.service.Arduino.AckLock;
 import org.myrobotlab.service.interfaces.RecordControl;
 import org.myrobotlab.service.interfaces.SerialDataListener;
 import org.myrobotlab.service.interfaces.SerialDevice;
@@ -500,9 +499,9 @@ public class VirtualArduino extends Service implements SerialDataListener, Recor
 
 	int error_mrl_to_arduino_rx_cnt = 0;
 
-	boolean ackEnabled = false;
+	boolean ackEnabled = true;
 
-	transient AckLock ackRecievedLock = new AckLock();
+	// transient AckLock ackRecievedLock = new AckLock();
 
 	Boolean debug = false;
 
@@ -562,15 +561,7 @@ public class VirtualArduino extends Service implements SerialDataListener, Recor
 				msg.processCommand(ioCmd);
 
 				if (ackEnabled) {
-					/*
-					 * we doon need no stink'ing ack'ing synchronized
-					 * (ackRecievedLock) { try { ackRecievedLock.wait(2000); }
-					 * catch (InterruptedException e) {// don't care} }
-					 * 
-					 * if (!ackRecievedLock.acknowledged) { log.error(
-					 * "Ack not received : {} {}", Msg.methodToString(ioCmd[0]),
-					 * numAck); } }
-					 */
+				  msg.publishAck(7);
 				}
 
 				// clean up memory/buffers
@@ -726,8 +717,7 @@ public class VirtualArduino extends Service implements SerialDataListener, Recor
 	}
 
 	public void enableAck(Boolean enabled) {
-		// TODO Auto-generated method stub
-
+	  ackEnabled = enabled;
 	}
 
 	public void enableHeartbeat(Boolean enabled) {
@@ -739,9 +729,9 @@ public class VirtualArduino extends Service implements SerialDataListener, Recor
 		msg.publishHeartbeat();
 	}
 
-	public void echo(Long sInt) {
-		log.info("varduino.echo {}", sInt);
-		msg.publishEcho(sInt);
+	public void echo(float myFloat, int myByte, float mySecondFloat) {
+		log.info("varduino.echo {} {} {}", myFloat, myByte, mySecondFloat);
+		msg.publishEcho(myFloat, myByte, mySecondFloat);
 	}
 
 	public void controllerAttach(Integer serialPort) {
@@ -1008,6 +998,10 @@ public class VirtualArduino extends Service implements SerialDataListener, Recor
 
   public void servoDetachPin(Integer deviceId) {
     ((MrlServo)getDevice(deviceId)).detachPin();
+  }
+
+  public void servoMoveToMicroseconds(Integer deviceId, Integer target) {
+    log.info("servoMoveToMicroseconds {} {}", deviceId, target);
   }
 
 }

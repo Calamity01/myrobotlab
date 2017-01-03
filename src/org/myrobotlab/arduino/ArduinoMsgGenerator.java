@@ -188,6 +188,8 @@ public class ArduinoMsgGenerator {
 
     br.close();
 
+    fileSnr.put("%enableAck%", "enableAck(b);");
+    
     // file templates
     fileSnr.put("%MRLCOMM_VERSION%", MRLCOMM_VERSION.toString());
     fileSnr.put("%defines%", defines.toString());
@@ -237,6 +239,7 @@ public class ArduinoMsgGenerator {
     fileSnr.put("%javaMethods%", vJavaMethods.toString());
     fileSnr.put("%javaGeneratedCallBacks%", vJavaGeneratedCallBacks.toString());
 
+    fileSnr.put("%enableAck%", "// enableAck(b);");
     for (String searchKey : fileSnr.keySet()) {
       virtualJava = virtualJava.replace(searchKey, fileSnr.get(searchKey));
     }
@@ -277,6 +280,8 @@ public class ArduinoMsgGenerator {
       return "byte*";
     } else if (idlType.equals("bool")) {
       return "bool";
+    } else if (idlType.equals("f32")) {
+      return "float";
     } else if (idlType.equals("")) {
       return "byte";
     }
@@ -299,6 +304,8 @@ public class ArduinoMsgGenerator {
       return "int[]";
     } else if (idlType.equals("bool")) {
       return "Boolean";
+    } else if (idlType.equals("f32")) {
+      return "Float";
     } else if (idlType.equals("")) {
       return "Integer";
     }
@@ -321,6 +328,8 @@ public class ArduinoMsgGenerator {
       return 1;
     } else if (idlType.equals("")) {
       return 1;
+    } else if (idlType.equals("f32")) {
+      return 4;
     } else if (idlType.equals("str")) {
       return -1;
     } else if (idlType.equals("[]")) {
@@ -616,7 +625,7 @@ public class ArduinoMsgGenerator {
 
     snr.put("%cppWrite%", cppWrite.toString());
     snr.put("%javaWrite%", javaWrite.toString());
-    snr.put("%javaSendRecord%", javaSendRecord.toString());
+    snr.put("%javaSendRecord%", javaSendRecord.toString());    
 
     javaSendRecord.append("\t\t\t\trecord.write(txBuffer.toString().getBytes());\n");
 
@@ -651,6 +660,8 @@ public class ArduinoMsgGenerator {
       methodSnr.put("vJavaHandleCase", "");
       methodSnr.put("vJavaGeneratedCallBack", "");
 
+      
+      
     } else {
       // cpp recv methods
       methodSnr.put("hMethod", "");
@@ -668,6 +679,8 @@ public class ArduinoMsgGenerator {
           javaCaseHeader.toString() + javaCaseArduinoMethod + javaCaseParams + javaCaseArduinoMethodComment + javaCaseParams + "\n\t\t\t}" + javaCaseFooter);
       methodSnr.put("vJavaGeneratedCallBack", javaGeneratedCallback + javaMethodParameters.toString() + "){}\n");
       methodSnr.put("vJavaMethod", "");
+      
+     // snr.put("%enableAck%", "enableAck(b);");
     }
 
     log.info("\n\n{}", hMethod);

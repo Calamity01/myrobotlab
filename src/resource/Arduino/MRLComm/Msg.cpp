@@ -76,8 +76,8 @@ Msg* Msg::getInstance() {
 	void enableHeartbeat( boolean enabled);
 	// > heartbeat
 	void heartbeat();
-	// > echo/bu32 sInt
-	void echo( unsigned long sInt);
+	// > echo/f32 myFloat/myByte/f32 secondFloat
+	void echo( float myFloat,  byte myByte,  float secondFloat);
 	// > controllerAttach/serialPort
 	void controllerAttach( byte serialPort);
 	// > customMsg/[] msg
@@ -120,10 +120,8 @@ Msg* Msg::getInstance() {
 	void servoSweepStart( byte deviceId,  byte min,  byte max,  byte step);
 	// > servoSweepStop/deviceId
 	void servoSweepStop( byte deviceId);
-	// > servoWrite/deviceId/b16 target
-	void servoWrite( byte deviceId,  int target);
-	// > servoWriteMicroseconds/deviceId/b16 ms
-	void servoWriteMicroseconds( byte deviceId,  int ms);
+	// > servoMoveToMicroseconds/deviceId/b16 target
+	void servoMoveToMicroseconds( byte deviceId,  int target);
 	// > servoSetAcceleration/deviceId/b16 acceleration
 	void servoSetAcceleration( byte deviceId,  int acceleration);
 	// > serialAttach/deviceId/relayPin
@@ -176,11 +174,13 @@ void Msg::publishHeartbeat() {
   reset();
 }
 
-void Msg::publishEcho( unsigned long sInt) {
+void Msg::publishEcho( float myFloat,  byte myByte,  float secondFloat) {
   write(MAGIC_NUMBER);
-  write(1 + 4); // size
+  write(1 + 4 + 1 + 4); // size
   write(PUBLISH_ECHO); // msgType = 15
-  writebu32(sInt);
+  writef32(myFloat);
+  write(myByte);
+  writef32(secondFloat);
   flush();
   reset();
 }
@@ -246,7 +246,7 @@ void Msg::publishPinArray(const byte* data,  byte dataSize) {
 void Msg::publishSerialData( byte deviceId, const byte* data,  byte dataSize) {
   write(MAGIC_NUMBER);
   write(1 + 1 + (1 + dataSize)); // size
-  write(PUBLISH_SERIAL_DATA); // msgType = 51
+  write(PUBLISH_SERIAL_DATA); // msgType = 50
   write(deviceId);
   write((byte*)data, dataSize);
   flush();
@@ -256,7 +256,7 @@ void Msg::publishSerialData( byte deviceId, const byte* data,  byte dataSize) {
 void Msg::publishUltrasonicSensorData( byte deviceId,  int echoTime) {
   write(MAGIC_NUMBER);
   write(1 + 1 + 2); // size
-  write(PUBLISH_ULTRASONIC_SENSOR_DATA); // msgType = 55
+  write(PUBLISH_ULTRASONIC_SENSOR_DATA); // msgType = 54
   write(deviceId);
   writeb16(echoTime);
   flush();
@@ -323,9 +323,13 @@ void Msg::processCommand() {
 			break;
 	}
 	case ECHO: { // echo
-			unsigned long sInt = bu32(ioCmd, startPos+1);
-			startPos += 4; //bu32
-			mrlComm->echo( sInt);
+			float myFloat = f32(ioCmd, startPos+1);
+			startPos += 4; //f32
+			byte myByte = ioCmd[startPos+1]; // bu8
+			startPos += 1;
+			float secondFloat = f32(ioCmd, startPos+1);
+			startPos += 4; //f32
+			mrlComm->echo( myFloat,  myByte,  secondFloat);
 			break;
 	}
 	case CONTROLLER_ATTACH: { // controllerAttach
@@ -533,20 +537,12 @@ void Msg::processCommand() {
 			mrlComm->servoSweepStop( deviceId);
 			break;
 	}
-	case SERVO_WRITE: { // servoWrite
+	case SERVO_MOVE_TO_MICROSECONDS: { // servoMoveToMicroseconds
 			byte deviceId = ioCmd[startPos+1]; // bu8
 			startPos += 1;
 			int target = b16(ioCmd, startPos+1);
 			startPos += 2; //b16
-			mrlComm->servoWrite( deviceId,  target);
-			break;
-	}
-	case SERVO_WRITE_MICROSECONDS: { // servoWriteMicroseconds
-			byte deviceId = ioCmd[startPos+1]; // bu8
-			startPos += 1;
-			int ms = b16(ioCmd, startPos+1);
-			startPos += 2; //b16
-			mrlComm->servoWriteMicroseconds( deviceId,  ms);
+			mrlComm->servoMoveToMicroseconds( deviceId,  target);
 			break;
 	}
 	case SERVO_SET_ACCELERATION: { // servoSetAcceleration
@@ -635,6 +631,15 @@ long Msg::b32(const byte* buffer, const int start/*=0*/) {
         result |= (buffer[start + i] & 0xFF);
     }
     return result;
+}
+
+float Msg::f32(const byte* buffer, const int start/*=0*/) {
+
+	const byte * ptr = buffer + start;
+
+    float newFloat = 0;
+    memcpy(&newFloat, ptr, sizeof(newFloat));
+    return newFloat;
 }
 
 unsigned long Msg::bu32(const byte* buffer, const int start/*=0*/) {
@@ -727,6 +732,18 @@ void Msg::writeb32(const long b32){
 	write(b32 >> 16 & 0xFF);
 	write(b32 >> 8 & 0xFF);
 	write(b32 & 0xFF);
+}
+
+void Msg::writef32(const float f32){
+	byte temp [4];
+
+    float newFloat = 0;
+    memcpy(temp, &f32, sizeof(newFloat));
+
+	write(temp[3]);
+	write(temp[2]);
+	write(temp[1]);
+	write(temp[0]);
 }
 
 void Msg::writebu32(const unsigned long bu32){

@@ -3,6 +3,8 @@ package org.myrobotlab.arduino;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.Arrays;
 
 import org.myrobotlab.logging.Level;
@@ -64,6 +66,16 @@ public class %javaClass% {
 	// ------ device type mapping constants
 	
 	boolean invoke = true;
+	
+	boolean ackEnabled = true;
+	
+	 public static class AckLock {
+	    // first is always true - since there
+	    // is no msg to be acknowledged...
+	    volatile boolean acknowledged = true;
+	  }
+	 
+	transient AckLock ackRecievedLock = new AckLock();
 	
 	// recording related
 	transient FileOutputStream record = null;
@@ -170,6 +182,15 @@ public class %javaClass% {
 		return ret;
 	}
 
+  // float 32 bit bucket
+  public float f32(int[] buffer, int start/*=0*/) {
+    byte[] b = new byte[4];
+    for (int i = 0; i < 4; ++i){
+      b[i] = (byte)buffer[start + i];
+    }
+    float f = ByteBuffer.wrap(b).order(ByteOrder.BIG_ENDIAN).getFloat();
+    return f;
+  }
 
 	void write(int b8) throws Exception {
 
@@ -202,6 +223,15 @@ public class %javaClass% {
 		write(b32 >> 16 & 0xFF);
 		write(b32 >> 8 & 0xFF);
 		write(b32 & 0xFF);
+	}
+	
+	void writef32(float f32) throws Exception {
+    //  int x = Float.floatToIntBits(f32);
+    byte[] f = ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN).putFloat(f32).array();
+    write(f[3] & 0xFF);
+    write(f[2] & 0xFF);
+    write(f[1] & 0xFF);
+    write(f[0] & 0xFF);
 	}
 	
 	void writebu32(long b32) throws Exception {
@@ -266,7 +296,49 @@ public class %javaClass% {
 		}
 		}
 	}
+  
+  /**
+   * enable acks on both sides Arduino/Java-Land
+   * and MrlComm-land
+   */
+  public void enableAcks(boolean b){
+    // disable local blocking
+	  ackEnabled = b;
+	  // if (!localOnly){
+	  // shutdown MrlComm from sending acks
+	  // below is a method only in Msg.java not in VirtualMsg.java
+	  // it depends on the definition of enableAck in arduinoMsg.schema  
+	  // %enableAck%
+	  // }
+	}
+	
+	public void waitForAck(){
+	  if (!ackEnabled || ackRecievedLock.acknowledged){
+	    return;
+	  }
+    synchronized (ackRecievedLock) {
+      try {
+        long ts = System.currentTimeMillis();
+        // log.info("***** starting wait *****");
+        ackRecievedLock.wait(2000);
+        // log.info("*****  waited {} ms *****", (System.currentTimeMillis() - ts));
+      } catch (InterruptedException e) {// don't care}
+      }
 
+      if (!ackRecievedLock.acknowledged) {
+        //log.error("Ack not received : {} {}", Msg.methodToString(ioCmd[0]), numAck);
+        log.error("Ack not received");
+      }
+    }
+	}
+	
+	public void ackReceived(int function){
+	   synchronized (ackRecievedLock) {
+	      ackRecievedLock.acknowledged = true;
+	      ackRecievedLock.notifyAll();
+	    }
+	}
+	
 	public static void main(String[] args) {
 		try {
 

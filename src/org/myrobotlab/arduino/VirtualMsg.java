@@ -3,6 +3,8 @@ package org.myrobotlab.arduino;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.Arrays;
 
 import org.myrobotlab.logging.Level;
@@ -65,6 +67,16 @@ public class VirtualMsg {
 	
 	boolean invoke = true;
 	
+	boolean ackEnabled = true;
+	
+	 public static class AckLock {
+	    // first is always true - since there
+	    // is no msg to be acknowledged...
+	    volatile boolean acknowledged = true;
+	  }
+	 
+	transient AckLock ackRecievedLock = new AckLock();
+	
 	// recording related
 	transient FileOutputStream record = null;
 	transient StringBuilder rxBuffer = new StringBuilder();
@@ -106,9 +118,9 @@ public class VirtualMsg {
 	public final static int HEARTBEAT = 12;
 	// < publishHeartbeat
 	public final static int PUBLISH_HEARTBEAT = 13;
-	// > echo/bu32 sInt
+	// > echo/f32 myFloat/myByte/f32 secondFloat
 	public final static int ECHO = 14;
-	// < publishEcho/bu32 sInt
+	// < publishEcho/f32 myFloat/myByte/f32 secondFloat
 	public final static int PUBLISH_ECHO = 15;
 	// > controllerAttach/serialPort
 	public final static int CONTROLLER_ATTACH = 16;
@@ -170,26 +182,24 @@ public class VirtualMsg {
 	public final static int SERVO_SWEEP_START = 44;
 	// > servoSweepStop/deviceId
 	public final static int SERVO_SWEEP_STOP = 45;
-	// > servoWrite/deviceId/b16 target
-	public final static int SERVO_WRITE = 46;
-	// > servoWriteMicroseconds/deviceId/b16 ms
-	public final static int SERVO_WRITE_MICROSECONDS = 47;
+	// > servoMoveToMicroseconds/deviceId/b16 target
+	public final static int SERVO_MOVE_TO_MICROSECONDS = 46;
 	// > servoSetAcceleration/deviceId/b16 acceleration
-	public final static int SERVO_SET_ACCELERATION = 48;
+	public final static int SERVO_SET_ACCELERATION = 47;
 	// > serialAttach/deviceId/relayPin
-	public final static int SERIAL_ATTACH = 49;
+	public final static int SERIAL_ATTACH = 48;
 	// > serialRelay/deviceId/[] data
-	public final static int SERIAL_RELAY = 50;
+	public final static int SERIAL_RELAY = 49;
 	// < publishSerialData/deviceId/[] data
-	public final static int PUBLISH_SERIAL_DATA = 51;
+	public final static int PUBLISH_SERIAL_DATA = 50;
 	// > ultrasonicSensorAttach/deviceId/triggerPin/echoPin
-	public final static int ULTRASONIC_SENSOR_ATTACH = 52;
+	public final static int ULTRASONIC_SENSOR_ATTACH = 51;
 	// > ultrasonicSensorStartRanging/deviceId
-	public final static int ULTRASONIC_SENSOR_START_RANGING = 53;
+	public final static int ULTRASONIC_SENSOR_START_RANGING = 52;
 	// > ultrasonicSensorStopRanging/deviceId
-	public final static int ULTRASONIC_SENSOR_STOP_RANGING = 54;
+	public final static int ULTRASONIC_SENSOR_STOP_RANGING = 53;
 	// < publishUltrasonicSensorData/deviceId/b16 echoTime
-	public final static int PUBLISH_ULTRASONIC_SENSOR_DATA = 55;
+	public final static int PUBLISH_ULTRASONIC_SENSOR_DATA = 54;
 
 
 /**
@@ -205,7 +215,7 @@ public class VirtualMsg {
 	// public void enableAck(Boolean enabled/*bool*/){}
 	// public void enableHeartbeat(Boolean enabled/*bool*/){}
 	// public void heartbeat(){}
-	// public void echo(Long sInt/*bu32*/){}
+	// public void echo(Float myFloat/*f32*/, Integer myByte/*byte*/, Float secondFloat/*f32*/){}
 	// public void controllerAttach(Integer serialPort/*byte*/){}
 	// public void customMsg(int[] msg/*[]*/){}
 	// public void deviceDetach(Integer deviceId/*byte*/){}
@@ -230,8 +240,7 @@ public class VirtualMsg {
 	// public void servoSetVelocity(Integer deviceId/*byte*/, Integer velocity/*b16*/){}
 	// public void servoSweepStart(Integer deviceId/*byte*/, Integer min/*byte*/, Integer max/*byte*/, Integer step/*byte*/){}
 	// public void servoSweepStop(Integer deviceId/*byte*/){}
-	// public void servoWrite(Integer deviceId/*byte*/, Integer target/*b16*/){}
-	// public void servoWriteMicroseconds(Integer deviceId/*byte*/, Integer ms/*b16*/){}
+	// public void servoMoveToMicroseconds(Integer deviceId/*byte*/, Integer target/*b16*/){}
 	// public void servoSetAcceleration(Integer deviceId/*byte*/, Integer acceleration/*b16*/){}
 	// public void serialAttach(Integer deviceId/*byte*/, Integer relayPin/*byte*/){}
 	// public void serialRelay(Integer deviceId/*byte*/, int[] data/*[]*/){}
@@ -367,12 +376,16 @@ public class VirtualMsg {
 			break;
 		}
 		case ECHO: {
-			Long sInt = bu32(ioCmd, startPos+1);
-			startPos += 4; //bu32
+			Float myFloat = f32(ioCmd, startPos+1);
+			startPos += 4; //f32
+			Integer myByte = ioCmd[startPos+1]; // bu8
+			startPos += 1;
+			Float secondFloat = f32(ioCmd, startPos+1);
+			startPos += 4; //f32
 			if(invoke){
-				arduino.invoke("echo",  sInt);
+				arduino.invoke("echo",  myFloat,  myByte,  secondFloat);
 			} else { 
- 				arduino.echo( sInt);
+ 				arduino.echo( myFloat,  myByte,  secondFloat);
 			}
 			break;
 		}
@@ -674,27 +687,15 @@ public class VirtualMsg {
 			}
 			break;
 		}
-		case SERVO_WRITE: {
+		case SERVO_MOVE_TO_MICROSECONDS: {
 			Integer deviceId = ioCmd[startPos+1]; // bu8
 			startPos += 1;
 			Integer target = b16(ioCmd, startPos+1);
 			startPos += 2; //b16
 			if(invoke){
-				arduino.invoke("servoWrite",  deviceId,  target);
+				arduino.invoke("servoMoveToMicroseconds",  deviceId,  target);
 			} else { 
- 				arduino.servoWrite( deviceId,  target);
-			}
-			break;
-		}
-		case SERVO_WRITE_MICROSECONDS: {
-			Integer deviceId = ioCmd[startPos+1]; // bu8
-			startPos += 1;
-			Integer ms = b16(ioCmd, startPos+1);
-			startPos += 2; //b16
-			if(invoke){
-				arduino.invoke("servoWriteMicroseconds",  deviceId,  ms);
-			} else { 
- 				arduino.servoWriteMicroseconds( deviceId,  ms);
+ 				arduino.servoMoveToMicroseconds( deviceId,  target);
 			}
 			break;
 		}
@@ -777,11 +778,19 @@ public class VirtualMsg {
 
 	public void publishMRLCommError(String errorMsg/*str*/) {
 		try {
+		  if (ackEnabled){
+		    waitForAck();
+		  }		  
 			write(MAGIC_NUMBER);
 			write(1 + (1 + errorMsg.length())); // size
 			write(PUBLISH_MRLCOMM_ERROR); // msgType = 1
 			write(errorMsg);
  
+     if (ackEnabled){
+       // we just wrote - block threads sending
+       // until they get an ack
+       ackRecievedLock.acknowledged = false;
+     }
 			if(record != null){
 				txBuffer.append("> publishMRLCommError");
 				txBuffer.append("/");
@@ -798,12 +807,20 @@ public class VirtualMsg {
 
 	public void publishBoardInfo(Integer version/*byte*/, Integer boardType/*byte*/) {
 		try {
+		  if (ackEnabled){
+		    waitForAck();
+		  }		  
 			write(MAGIC_NUMBER);
 			write(1 + 1 + 1); // size
 			write(PUBLISH_BOARD_INFO); // msgType = 3
 			write(version);
 			write(boardType);
  
+     if (ackEnabled){
+       // we just wrote - block threads sending
+       // until they get an ack
+       ackRecievedLock.acknowledged = false;
+     }
 			if(record != null){
 				txBuffer.append("> publishBoardInfo");
 				txBuffer.append("/");
@@ -822,11 +839,19 @@ public class VirtualMsg {
 
 	public void publishAck(Integer function/*byte*/) {
 		try {
+		  if (ackEnabled){
+		    waitForAck();
+		  }		  
 			write(MAGIC_NUMBER);
 			write(1 + 1); // size
 			write(PUBLISH_ACK); // msgType = 10
 			write(function);
  
+     if (ackEnabled){
+       // we just wrote - block threads sending
+       // until they get an ack
+       ackRecievedLock.acknowledged = false;
+     }
 			if(record != null){
 				txBuffer.append("> publishAck");
 				txBuffer.append("/");
@@ -843,10 +868,18 @@ public class VirtualMsg {
 
 	public void publishHeartbeat() {
 		try {
+		  if (ackEnabled){
+		    waitForAck();
+		  }		  
 			write(MAGIC_NUMBER);
 			write(1); // size
 			write(PUBLISH_HEARTBEAT); // msgType = 13
  
+     if (ackEnabled){
+       // we just wrote - block threads sending
+       // until they get an ack
+       ackRecievedLock.acknowledged = false;
+     }
 			if(record != null){
 				txBuffer.append("> publishHeartbeat");
 				txBuffer.append("\n");
@@ -859,17 +892,31 @@ public class VirtualMsg {
 	  }
 	}
 
-	public void publishEcho(Long sInt/*bu32*/) {
+	public void publishEcho(Float myFloat/*f32*/, Integer myByte/*byte*/, Float secondFloat/*f32*/) {
 		try {
+		  if (ackEnabled){
+		    waitForAck();
+		  }		  
 			write(MAGIC_NUMBER);
-			write(1 + 4); // size
+			write(1 + 4 + 1 + 4); // size
 			write(PUBLISH_ECHO); // msgType = 15
-			writebu32(sInt);
+			writef32(myFloat);
+			write(myByte);
+			writef32(secondFloat);
  
+     if (ackEnabled){
+       // we just wrote - block threads sending
+       // until they get an ack
+       ackRecievedLock.acknowledged = false;
+     }
 			if(record != null){
 				txBuffer.append("> publishEcho");
 				txBuffer.append("/");
-				txBuffer.append(sInt);
+				txBuffer.append(myFloat);
+				txBuffer.append("/");
+				txBuffer.append(myByte);
+				txBuffer.append("/");
+				txBuffer.append(secondFloat);
 				txBuffer.append("\n");
 				record.write(txBuffer.toString().getBytes());
 				txBuffer.setLength(0);
@@ -882,11 +929,19 @@ public class VirtualMsg {
 
 	public void publishCustomMsg(int[] msg/*[]*/) {
 		try {
+		  if (ackEnabled){
+		    waitForAck();
+		  }		  
 			write(MAGIC_NUMBER);
 			write(1 + (1 + msg.length)); // size
 			write(PUBLISH_CUSTOM_MSG); // msgType = 18
 			write(msg);
  
+     if (ackEnabled){
+       // we just wrote - block threads sending
+       // until they get an ack
+       ackRecievedLock.acknowledged = false;
+     }
 			if(record != null){
 				txBuffer.append("> publishCustomMsg");
 				txBuffer.append("/");
@@ -903,12 +958,20 @@ public class VirtualMsg {
 
 	public void publishI2cData(Integer deviceId/*byte*/, int[] data/*[]*/) {
 		try {
+		  if (ackEnabled){
+		    waitForAck();
+		  }		  
 			write(MAGIC_NUMBER);
 			write(1 + 1 + (1 + data.length)); // size
 			write(PUBLISH_I2C_DATA); // msgType = 24
 			write(deviceId);
 			write(data);
  
+     if (ackEnabled){
+       // we just wrote - block threads sending
+       // until they get an ack
+       ackRecievedLock.acknowledged = false;
+     }
 			if(record != null){
 				txBuffer.append("> publishI2cData");
 				txBuffer.append("/");
@@ -927,12 +990,20 @@ public class VirtualMsg {
 
 	public void publishAttachedDevice(Integer deviceId/*byte*/, String deviceName/*str*/) {
 		try {
+		  if (ackEnabled){
+		    waitForAck();
+		  }		  
 			write(MAGIC_NUMBER);
 			write(1 + 1 + (1 + deviceName.length())); // size
 			write(PUBLISH_ATTACHED_DEVICE); // msgType = 33
 			write(deviceId);
 			write(deviceName);
  
+     if (ackEnabled){
+       // we just wrote - block threads sending
+       // until they get an ack
+       ackRecievedLock.acknowledged = false;
+     }
 			if(record != null){
 				txBuffer.append("> publishAttachedDevice");
 				txBuffer.append("/");
@@ -951,6 +1022,9 @@ public class VirtualMsg {
 
 	public void publishBoardStatus(Integer microsPerLoop/*b16*/, Integer sram/*b16*/, int[] deviceSummary/*[]*/) {
 		try {
+		  if (ackEnabled){
+		    waitForAck();
+		  }		  
 			write(MAGIC_NUMBER);
 			write(1 + 2 + 2 + (1 + deviceSummary.length)); // size
 			write(PUBLISH_BOARD_STATUS); // msgType = 34
@@ -958,6 +1032,11 @@ public class VirtualMsg {
 			writeb16(sram);
 			write(deviceSummary);
  
+     if (ackEnabled){
+       // we just wrote - block threads sending
+       // until they get an ack
+       ackRecievedLock.acknowledged = false;
+     }
 			if(record != null){
 				txBuffer.append("> publishBoardStatus");
 				txBuffer.append("/");
@@ -978,11 +1057,19 @@ public class VirtualMsg {
 
 	public void publishDebug(String debugMsg/*str*/) {
 		try {
+		  if (ackEnabled){
+		    waitForAck();
+		  }		  
 			write(MAGIC_NUMBER);
 			write(1 + (1 + debugMsg.length())); // size
 			write(PUBLISH_DEBUG); // msgType = 35
 			write(debugMsg);
  
+     if (ackEnabled){
+       // we just wrote - block threads sending
+       // until they get an ack
+       ackRecievedLock.acknowledged = false;
+     }
 			if(record != null){
 				txBuffer.append("> publishDebug");
 				txBuffer.append("/");
@@ -999,11 +1086,19 @@ public class VirtualMsg {
 
 	public void publishPinArray(int[] data/*[]*/) {
 		try {
+		  if (ackEnabled){
+		    waitForAck();
+		  }		  
 			write(MAGIC_NUMBER);
 			write(1 + (1 + data.length)); // size
 			write(PUBLISH_PIN_ARRAY); // msgType = 36
 			write(data);
  
+     if (ackEnabled){
+       // we just wrote - block threads sending
+       // until they get an ack
+       ackRecievedLock.acknowledged = false;
+     }
 			if(record != null){
 				txBuffer.append("> publishPinArray");
 				txBuffer.append("/");
@@ -1020,12 +1115,20 @@ public class VirtualMsg {
 
 	public void publishSerialData(Integer deviceId/*byte*/, int[] data/*[]*/) {
 		try {
+		  if (ackEnabled){
+		    waitForAck();
+		  }		  
 			write(MAGIC_NUMBER);
 			write(1 + 1 + (1 + data.length)); // size
-			write(PUBLISH_SERIAL_DATA); // msgType = 51
+			write(PUBLISH_SERIAL_DATA); // msgType = 50
 			write(deviceId);
 			write(data);
  
+     if (ackEnabled){
+       // we just wrote - block threads sending
+       // until they get an ack
+       ackRecievedLock.acknowledged = false;
+     }
 			if(record != null){
 				txBuffer.append("> publishSerialData");
 				txBuffer.append("/");
@@ -1044,12 +1147,20 @@ public class VirtualMsg {
 
 	public void publishUltrasonicSensorData(Integer deviceId/*byte*/, Integer echoTime/*b16*/) {
 		try {
+		  if (ackEnabled){
+		    waitForAck();
+		  }		  
 			write(MAGIC_NUMBER);
 			write(1 + 1 + 2); // size
-			write(PUBLISH_ULTRASONIC_SENSOR_DATA); // msgType = 55
+			write(PUBLISH_ULTRASONIC_SENSOR_DATA); // msgType = 54
 			write(deviceId);
 			writeb16(echoTime);
  
+     if (ackEnabled){
+       // we just wrote - block threads sending
+       // until they get an ack
+       ackRecievedLock.acknowledged = false;
+     }
 			if(record != null){
 				txBuffer.append("> publishUltrasonicSensorData");
 				txBuffer.append("/");
@@ -1204,11 +1315,8 @@ public class VirtualMsg {
 		case SERVO_SWEEP_STOP:{
 			return "servoSweepStop";
 		}
-		case SERVO_WRITE:{
-			return "servoWrite";
-		}
-		case SERVO_WRITE_MICROSECONDS:{
-			return "servoWriteMicroseconds";
+		case SERVO_MOVE_TO_MICROSECONDS:{
+			return "servoMoveToMicroseconds";
 		}
 		case SERVO_SET_ACCELERATION:{
 			return "servoSetAcceleration";
@@ -1277,6 +1385,15 @@ public class VirtualMsg {
 		return ret;
 	}
 
+  // float 32 bit bucket
+  public float f32(int[] buffer, int start/*=0*/) {
+    byte[] b = new byte[4];
+    for (int i = 0; i < 4; ++i){
+      b[i] = (byte)buffer[start + i];
+    }
+    float f = ByteBuffer.wrap(b).order(ByteOrder.BIG_ENDIAN).getFloat();
+    return f;
+  }
 
 	void write(int b8) throws Exception {
 
@@ -1309,6 +1426,15 @@ public class VirtualMsg {
 		write(b32 >> 16 & 0xFF);
 		write(b32 >> 8 & 0xFF);
 		write(b32 & 0xFF);
+	}
+	
+	void writef32(float f32) throws Exception {
+    //  int x = Float.floatToIntBits(f32);
+    byte[] f = ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN).putFloat(f32).array();
+    write(f[3] & 0xFF);
+    write(f[2] & 0xFF);
+    write(f[1] & 0xFF);
+    write(f[0] & 0xFF);
 	}
 	
 	void writebu32(long b32) throws Exception {
@@ -1409,7 +1535,49 @@ public class VirtualMsg {
 		}
 		}
 	}
+  
+  /**
+   * enable acks on both sides Arduino/Java-Land
+   * and MrlComm-land
+   */
+  public void enableAcks(boolean b){
+    // disable local blocking
+	  ackEnabled = b;
+	  // if (!localOnly){
+	  // shutdown MrlComm from sending acks
+	  // below is a method only in Msg.java not in VirtualMsg.java
+	  // it depends on the definition of enableAck in arduinoMsg.schema  
+	  // // enableAck(b);
+	  // }
+	}
+	
+	public void waitForAck(){
+	  if (!ackEnabled || ackRecievedLock.acknowledged){
+	    return;
+	  }
+    synchronized (ackRecievedLock) {
+      try {
+        long ts = System.currentTimeMillis();
+        // log.info("***** starting wait *****");
+        ackRecievedLock.wait(2000);
+        // log.info("*****  waited {} ms *****", (System.currentTimeMillis() - ts));
+      } catch (InterruptedException e) {// don't care}
+      }
 
+      if (!ackRecievedLock.acknowledged) {
+        //log.error("Ack not received : {} {}", Msg.methodToString(ioCmd[0]), numAck);
+        log.error("Ack not received");
+      }
+    }
+	}
+	
+	public void ackReceived(int function){
+	   synchronized (ackRecievedLock) {
+	      ackRecievedLock.acknowledged = true;
+	      ackRecievedLock.notifyAll();
+	    }
+	}
+	
 	public static void main(String[] args) {
 		try {
 
