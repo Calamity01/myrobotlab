@@ -648,6 +648,7 @@ public class OpenNi extends Service // implements
     // we should be able to use this to compute the depth for each pixel in
     // the RGB image.
     data.depthMap = context.depthMap();
+    data.depthMapRW = context.depthMapRealWorld();
 
     if (enableRGB) {
       data.rbgPImage = context.rgbImage();
@@ -896,7 +897,7 @@ public class OpenNi extends Service // implements
     Runtime.createAndStart("python", "Python");
 
     OpenNi openni = (OpenNi) Runtime.createAndStart("openni", "OpenNi");
-    openni.startUserTracking();
+    //openni.startUserTracking();
     // openni.recordSingleFrame();
     // openni.startHandTracking();
   }
